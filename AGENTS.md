@@ -65,8 +65,13 @@ properties:
 - Compute `china-other` as the union of upstream `cernet`, `cstnet`, `drpeng`,
   and `googlecn` without subtracting other operator sets.
 - Normalize every output to deterministic, sorted, minimal CIDRs.
-- Generate the 16 canonical IPv4 and IPv6 route table filenames documented in
-  `README.md`. Treat these names as a stable public interface.
+- Generate the 24 canonical IPv4, IPv6, and combined route table filenames
+  documented in `README.md`. Treat these names as a stable public interface.
+- For each set, make the `*46.txt` file the exact concatenation of its IPv4
+  file followed by its IPv6 file.
+- In output manifest schema version 2, encode `address_family` as `[4]` for
+  IPv4, `[6]` for IPv6, and `[4, 6]` for combined files. Continue recognizing
+  schema version 1 manifests so existing generated directories can be replaced.
 - Publish the complete distribution through a staging directory. Refuse to
   replace symlinks, overlapping input/output directories, or non-empty output
   directories not owned through a compatible generated manifest.

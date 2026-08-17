@@ -92,19 +92,26 @@ cargo run -- generate --input data/raw --output dist
 
 ### 输出文件
 
-每个集合分别生成 IPv4 和 IPv6 文件。IPv4 使用基本文件名，IPv6 在扩展名前增加
-`6`：
+每个集合生成 IPv4、IPv6 和双栈合并文件，共 24 个路由表文件。IPv4 使用基本
+文件名，IPv6 在扩展名前增加 `6`，合并文件增加 `46`：
 
-| 集合 | IPv4 | IPv6 |
-| --- | --- | --- |
-| 中国大陆 | `chnroute.txt` | `chnroute6.txt` |
-| 中国大陆以外的公网地址 | `non-chnroute.txt` | `non-chnroute6.txt` |
-| 中国电信 | `china-telecom.txt` | `china-telecom6.txt` |
-| 中国移动 | `china-mobile.txt` | `china-mobile6.txt` |
-| 中国联通 | `china-unicom.txt` | `china-unicom6.txt` |
-| 中国其他运营商 | `china-other.txt` | `china-other6.txt` |
-| 私有网络 | `private.txt` | `private6.txt` |
-| 其他非公网地址 | `special.txt` | `special6.txt` |
+| 集合 | IPv4 | IPv6 | IPv4 + IPv6 |
+| --- | --- | --- | --- |
+| 中国大陆 | `chnroute.txt` | `chnroute6.txt` | `chnroute46.txt` |
+| 中国大陆以外的公网地址 | `non-chnroute.txt` | `non-chnroute6.txt` | `non-chnroute46.txt` |
+| 中国电信 | `china-telecom.txt` | `china-telecom6.txt` | `china-telecom46.txt` |
+| 中国移动 | `china-mobile.txt` | `china-mobile6.txt` | `china-mobile46.txt` |
+| 中国联通 | `china-unicom.txt` | `china-unicom6.txt` | `china-unicom46.txt` |
+| 中国其他运营商 | `china-other.txt` | `china-other6.txt` | `china-other46.txt` |
+| 私有网络 | `private.txt` | `private6.txt` | `private46.txt` |
+| 其他非公网地址 | `special.txt` | `special6.txt` | `special46.txt` |
+
+每个 `46` 文件都是对应 IPv4 文件与 IPv6 文件的直接拼接，IPv4 内容在前，IPv6
+内容在后。例如：
+
+```text
+chnroute46.txt = chnroute.txt + chnroute6.txt
+```
 
 三个组合集合的定义如下：
 
@@ -130,6 +137,8 @@ non-chnroute = complete address space - private - special - chnroute
 
 所有输出都会按照地址顺序排列，并合并为确定且最小的 CIDR 集。`dist/manifest.json`
 记录输入仓库、提交散列，以及每个输出文件的地址族、CIDR 数量、文件大小和 SHA-256。
+输出清单 schema v2 将 `address_family` 统一表示为数组：IPv4 文件为 `[4]`，IPv6 文件为
+`[6]`，双栈合并文件为 `[4, 6]`。
 
 生成结果同样通过暂存目录整体发布。程序可以安全替换自己此前生成的目录，但不会替换
 符号链接、与输入目录重叠的目录，或缺少兼容 `manifest.json` 的非空目录。
@@ -164,7 +173,7 @@ scripts/publish-dist.sh --push
 发布到 GitHub 后，可以通过固定的原始文件 URL 订阅根目录中的文件：
 
 ```text
-https://raw.githubusercontent.com/<owner>/<repository>/dist/chnroute.txt
+https://raw.githubusercontent.com/<owner>/<repository>/dist/chnroute46.txt
 ```
 
 ## 测试

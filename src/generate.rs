@@ -11,30 +11,39 @@ use crate::ipset::{IpFamily, IpSet};
 use crate::publish::publish_staged_directory;
 use crate::source::{MANIFEST_FILE, REPOSITORY_ID, Snapshot, load_snapshot, sha256};
 
-const OUTPUT_SCHEMA_VERSION: u32 = 1;
+const OUTPUT_SCHEMA_VERSION: u32 = 2;
+const LEGACY_OUTPUT_SCHEMA_VERSION: u32 = 1;
 const GENERATOR_ID: &str = "chnroute";
 const PRIVATE_V4: &str = include_str!("../data/builtin/private.txt");
 const PRIVATE_V6: &str = include_str!("../data/builtin/private6.txt");
 const SPECIAL_V4: &str = include_str!("../data/builtin/special.txt");
 const SPECIAL_V6: &str = include_str!("../data/builtin/special6.txt");
 
-const OUTPUT_FILES: [&str; 16] = [
+const OUTPUT_FILES: [&str; 24] = [
     "chnroute.txt",
     "chnroute6.txt",
+    "chnroute46.txt",
     "non-chnroute.txt",
     "non-chnroute6.txt",
+    "non-chnroute46.txt",
     "china-telecom.txt",
     "china-telecom6.txt",
+    "china-telecom46.txt",
     "china-mobile.txt",
     "china-mobile6.txt",
+    "china-mobile46.txt",
     "china-unicom.txt",
     "china-unicom6.txt",
+    "china-unicom46.txt",
     "china-other.txt",
     "china-other6.txt",
+    "china-other46.txt",
     "private.txt",
     "private6.txt",
+    "private46.txt",
     "special.txt",
     "special6.txt",
+    "special46.txt",
 ];
 
 #[derive(Debug)]
@@ -54,7 +63,12 @@ pub struct GenerateResult {
 
 struct GeneratedFile {
     name: String,
-    family: IpFamily,
+    address_family: Vec<u8>,
+    text: String,
+}
+
+struct GeneratedSet {
+    base: &'static str,
     set: IpSet,
 }
 
@@ -77,7 +91,25 @@ struct OutputFileManifest {
     sha256: String,
     bytes: u64,
     prefixes: usize,
-    address_family: u8,
+    #[serde(deserialize_with = "deserialize_address_family")]
+    address_family: Vec<u8>,
+}
+
+fn deserialize_address_family<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum AddressFamily {
+        Legacy(u8),
+        Current(Vec<u8>),
+    }
+
+    match AddressFamily::deserialize(deserializer)? {
+        AddressFamily::Legacy(family) => Ok(vec![family]),
+        AddressFamily::Current(families) => Ok(families),
+    }
 }
 
 pub fn generate(options: GenerateOptions) -> Result<GenerateResult> {
@@ -103,16 +135,15 @@ pub fn generate(options: GenerateOptions) -> Result<GenerateResult> {
 
     let mut files = BTreeMap::new();
     for file in generated {
-        let text = file.set.to_text()?;
-        let bytes = text.as_bytes();
+        let bytes = file.text.as_bytes();
         write_staged_file(staging.path(), &file.name, bytes)?;
         files.insert(
             file.name,
             OutputFileManifest {
                 sha256: sha256(bytes),
                 bytes: bytes.len() as u64,
-                prefixes: text.lines().count(),
-                address_family: file.family.number(),
+                prefixes: file.text.lines().count(),
+                address_family: file.address_family,
             },
         );
     }
@@ -221,7 +252,11 @@ fn inspect_output(output: &Path) -> Result<()> {
         .with_context(|| format!("failed to read {}", manifest_path.display()))?;
     let manifest: OutputManifest = serde_json::from_slice(&bytes)
         .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
-    if manifest.schema_version != OUTPUT_SCHEMA_VERSION || manifest.generator != GENERATOR_ID {
+    if !matches!(
+        manifest.schema_version,
+        LEGACY_OUTPUT_SCHEMA_VERSION | OUTPUT_SCHEMA_VERSION
+    ) || manifest.generator != GENERATOR_ID
+    {
         bail!(
             "refusing to replace output owned by an incompatible generator or schema: {}",
             output.display()
@@ -232,14 +267,29 @@ fn inspect_output(output: &Path) -> Result<()> {
 }
 
 fn build_files(snapshot: &Snapshot) -> Result<Vec<GeneratedFile>> {
-    let mut files = build_family(snapshot, IpFamily::V4, PRIVATE_V4, SPECIAL_V4, "")?;
-    files.extend(build_family(
-        snapshot,
-        IpFamily::V6,
-        PRIVATE_V6,
-        SPECIAL_V6,
-        "6",
-    )?);
+    let ipv4 = build_family(snapshot, IpFamily::V4, PRIVATE_V4, SPECIAL_V4, "")?;
+    let ipv6 = build_family(snapshot, IpFamily::V6, PRIVATE_V6, SPECIAL_V6, "6")?;
+
+    if ipv4.len() != ipv6.len() {
+        bail!("internal IPv4 and IPv6 output mappings do not match");
+    }
+
+    let mut files = Vec::with_capacity(OUTPUT_FILES.len());
+    for (ipv4, ipv6) in ipv4.into_iter().zip(ipv6) {
+        if ipv4.base != ipv6.base {
+            bail!("internal IPv4 and IPv6 output mappings do not match");
+        }
+
+        let ipv4_text = ipv4.set.to_text()?;
+        let ipv6_text = ipv6.set.to_text()?;
+        let mut combined_text = String::with_capacity(ipv4_text.len() + ipv6_text.len());
+        combined_text.push_str(&ipv4_text);
+        combined_text.push_str(&ipv6_text);
+
+        files.push(generated(ipv4.base, "", vec![4], ipv4_text));
+        files.push(generated(ipv4.base, "6", vec![6], ipv6_text));
+        files.push(generated(ipv4.base, "46", vec![4, 6], combined_text));
+    }
 
     if files.len() != OUTPUT_FILES.len()
         || OUTPUT_FILES
@@ -257,7 +307,7 @@ fn build_family(
     private_rules: &str,
     special_rules: &str,
     suffix: &str,
-) -> Result<Vec<GeneratedFile>> {
+) -> Result<Vec<GeneratedSet>> {
     // Output semantics:
     // chnroute     = public addresses in mainland China
     // non-chnroute = public addresses outside chnroute
@@ -288,14 +338,14 @@ fn build_family(
         .subtract(&china)?;
 
     Ok(vec![
-        generated("chnroute", suffix, family, china),
-        generated("non-chnroute", suffix, family, non_chnroute),
-        generated("china-telecom", suffix, family, telecom),
-        generated("china-mobile", suffix, family, mobile),
-        generated("china-unicom", suffix, family, unicom),
-        generated("china-other", suffix, family, other),
-        generated("private", suffix, family, private),
-        generated("special", suffix, family, special),
+        generated_set("chnroute", china),
+        generated_set("non-chnroute", non_chnroute),
+        generated_set("china-telecom", telecom),
+        generated_set("china-mobile", mobile),
+        generated_set("china-unicom", unicom),
+        generated_set("china-other", other),
+        generated_set("private", private),
+        generated_set("special", special),
     ])
 }
 
@@ -308,11 +358,15 @@ fn source_set(snapshot: &Snapshot, name: &str, family: IpFamily) -> Result<IpSet
     IpSet::parse_cidrs(text, family, name)
 }
 
-fn generated(base: &str, suffix: &str, family: IpFamily, set: IpSet) -> GeneratedFile {
+fn generated_set(base: &'static str, set: IpSet) -> GeneratedSet {
+    GeneratedSet { base, set }
+}
+
+fn generated(base: &str, suffix: &str, address_family: Vec<u8>, text: String) -> GeneratedFile {
     GeneratedFile {
         name: format!("{base}{suffix}.txt"),
-        family,
-        set,
+        address_family,
+        text,
     }
 }
 
@@ -358,7 +412,7 @@ mod tests {
         })
         .unwrap();
 
-        assert_eq!(result.file_count, 16);
+        assert_eq!(result.file_count, 24);
         let names: BTreeSet<String> = fs::read_dir(&output)
             .unwrap()
             .map(|entry| entry.unwrap().file_name().into_string().unwrap())
@@ -380,6 +434,40 @@ mod tests {
             fs::read_to_string(output.join("china-other6.txt")).unwrap(),
             "2401::/32\n"
         );
+        assert_eq!(
+            fs::read_to_string(output.join("chnroute46.txt")).unwrap(),
+            "1.0.0.0/24\n2400::/32\n"
+        );
+        assert_eq!(
+            fs::read_to_string(output.join("china-other46.txt")).unwrap(),
+            "1.0.1.0/24\n2401::/32\n"
+        );
+
+        for combined_name in OUTPUT_FILES.iter().filter(|name| name.ends_with("46.txt")) {
+            let base = combined_name.strip_suffix("46.txt").unwrap();
+            let expected = format!(
+                "{}{}",
+                fs::read_to_string(output.join(format!("{base}.txt"))).unwrap(),
+                fs::read_to_string(output.join(format!("{base}6.txt"))).unwrap()
+            );
+            assert_eq!(
+                fs::read_to_string(output.join(combined_name)).unwrap(),
+                expected
+            );
+        }
+
+        let manifest: OutputManifest =
+            serde_json::from_slice(&fs::read(output.join(MANIFEST_FILE)).unwrap()).unwrap();
+        for name in OUTPUT_FILES {
+            let expected_family = if name.ends_with("46.txt") {
+                vec![4, 6]
+            } else if name.ends_with("6.txt") {
+                vec![6]
+            } else {
+                vec![4]
+            };
+            assert_eq!(manifest.files[name].address_family, expected_family);
+        }
 
         let non_v4 = IpSet::parse_cidrs(
             &fs::read_to_string(output.join("non-chnroute.txt")).unwrap(),
@@ -447,6 +535,51 @@ mod tests {
         })
         .unwrap();
         generate(GenerateOptions { input, output }).unwrap();
+    }
+
+    #[test]
+    fn can_replace_legacy_schema_one_output() {
+        let temp = tempfile::tempdir().unwrap();
+        let input = temp.path().join("raw");
+        let output = temp.path().join("dist");
+        write_source_snapshot(&input);
+
+        generate(GenerateOptions {
+            input: input.clone(),
+            output: output.clone(),
+        })
+        .unwrap();
+
+        let manifest_path = output.join(MANIFEST_FILE);
+        let mut manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+        manifest["schema_version"] = serde_json::json!(1);
+        let files = manifest["files"].as_object_mut().unwrap();
+        files.retain(|name, _| !name.ends_with("46.txt"));
+        for file in files.values_mut() {
+            let family = file["address_family"].as_array().unwrap()[0].clone();
+            file["address_family"] = family;
+        }
+        let mut bytes = serde_json::to_vec_pretty(&manifest).unwrap();
+        bytes.push(b'\n');
+        fs::write(&manifest_path, bytes).unwrap();
+        for name in OUTPUT_FILES.iter().filter(|name| name.ends_with("46.txt")) {
+            fs::remove_file(output.join(name)).unwrap();
+        }
+
+        generate(GenerateOptions {
+            input,
+            output: output.clone(),
+        })
+        .unwrap();
+
+        let manifest: serde_json::Value =
+            serde_json::from_slice(&fs::read(output.join(MANIFEST_FILE)).unwrap()).unwrap();
+        assert_eq!(manifest["schema_version"], serde_json::json!(2));
+        assert_eq!(
+            manifest["files"]["chnroute46.txt"]["address_family"],
+            serde_json::json!([4, 6])
+        );
     }
 
     fn write_source_snapshot(directory: &Path) {
