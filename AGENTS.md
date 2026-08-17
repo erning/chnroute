@@ -7,8 +7,9 @@ Operational guidance for coding agents working in this repository.
 `chnroute` is a Rust command-line program that fetches and generates IPv4 and
 IPv6 route tables by region and network operator.
 
-The current implementation provides only the `fetch` command. A `generate`
-command is planned but must remain a separate, offline stage.
+The `fetch` command acquires an upstream snapshot. The `generate` command is a
+separate, offline stage that verifies that snapshot and writes normalized route
+tables.
 
 ## Data Model
 
@@ -35,16 +36,41 @@ The planned generated sets have these semantics:
 - `private`: built-in project knowledge.
 - `special`: built-in special-use and other non-public address knowledge,
   excluding `private`.
-- `china`: the upstream `china` set.
-- `nonchina`: the public address space minus `china`.
+- `chnroute`: public addresses in mainland China from the upstream `china` set.
+- `non-chnroute`: public addresses outside `chnroute`.
 - `chinanet`: the upstream `chinanet` set.
 - `cmcc`: the upstream `cmcc` set.
 - `unicom`: the upstream `unicom` set.
-- `china-other`: the union of `cernet`, `cstnet`, `drpeng`, and `googlecn`.
+- `china-other`: other mainland China operators, implemented as the union of
+  `cernet`, `cstnet`, `drpeng`, and `googlecn`.
 
 Operator sets may overlap. Do not invent an operator precedence rule. Set
 normalization may change CIDR representation, but it must not change set
 membership.
+
+## Generate Contract
+
+`chnroute generate` is an offline transformation command. Keep these
+properties:
+
+- Read a complete snapshot produced by `fetch` and verify its manifest, file
+  sizes, and SHA-256 hashes before generation.
+- Compile the rules under `data/builtin/` into the executable. Do not require
+  those files to exist at runtime.
+- Apply built-in rules from top to bottom. Plain CIDRs add addresses, and
+  `!CIDR` rules remove addresses.
+- Keep `private` and `special` disjoint.
+- Compute `non-chnroute` as the complete address space minus `private`,
+  `special`, and upstream `china`.
+- Compute `china-other` as the union of upstream `cernet`, `cstnet`, `drpeng`,
+  and `googlecn` without subtracting other operator sets.
+- Normalize every output to deterministic, sorted, minimal CIDRs.
+- Generate the 16 canonical IPv4 and IPv6 route table filenames documented in
+  `README.md`. Treat these names as a stable public interface.
+- Publish the complete distribution through a staging directory. Refuse to
+  replace symlinks, overlapping input/output directories, or non-empty output
+  directories not owned through a compatible generated manifest.
+- Do not perform network access during generation.
 
 ## Fetch Contract
 
@@ -96,14 +122,16 @@ Cargo.toml       Rust package and dependencies
 Cargo.lock       Locked dependency graph
 src/main.rs      CLI parsing and terminal output boundary
 src/fetch.rs     Fetch workflow, validation, manifest, and tests
+src/generate.rs  Offline generation policy, output manifest, and tests
+src/ipset.rs     IPv4 and IPv6 set algebra and CIDR normalization
+src/source.rs    Shared upstream snapshot schema and integrity checks
+src/publish.rs   Atomic directory publication with rollback
 src/lib.rs       Library module exports
+data/builtin/    Built-in private and special address rules
 data/raw/        Downloaded upstream snapshot and manifest
+dist/            Generated route tables and manifest
 README.md        User documentation
 ```
-
-Place future IP set algebra in a dedicated module such as `src/ipset.rs`.
-Place future generation orchestration in `src/generate.rs`. Do not mix network
-access into generation code.
 
 ## Rust Conventions
 

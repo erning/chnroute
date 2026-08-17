@@ -4,6 +4,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand, error::ErrorKind};
 
 use chnroute::fetch::{FetchOptions, FetchStatus, fetch};
+use chnroute::generate::{GenerateOptions, generate};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -32,6 +33,17 @@ enum Command {
         /// Download again even when the local snapshot is current
         #[arg(long)]
         force: bool,
+    },
+
+    /// Generate normalized route tables from a fetched snapshot
+    Generate {
+        /// Directory containing fetched source data
+        #[arg(long, default_value = "data/raw")]
+        input: PathBuf,
+
+        /// Directory for generated route tables
+        #[arg(long, default_value = "dist")]
+        output: PathBuf,
     },
 }
 
@@ -81,6 +93,17 @@ fn run(cli: Cli) -> anyhow::Result<String> {
                     result.file_count
                 ),
             }
+        }
+        Command::Generate { input, output } => {
+            let result = generate(GenerateOptions { input, output })?;
+            format!(
+                "generated {} route tables ({} prefixes) from {}@{} into {}",
+                result.file_count,
+                result.prefix_count,
+                result.repository,
+                short_commit(&result.commit),
+                result.output.display()
+            )
         }
     };
 
@@ -143,5 +166,15 @@ mod tests {
     fn clap_errors_can_be_rendered_as_ascii() {
         let error = Cli::try_parse_from(["chnroute", "\u{751f}\u{6210}"]).unwrap_err();
         assert!(ascii_only(&error.to_string()).is_ascii());
+    }
+
+    #[test]
+    fn generate_uses_standard_directories_by_default() {
+        let cli = Cli::try_parse_from(["chnroute", "generate"]).unwrap();
+        let Command::Generate { input, output } = cli.command else {
+            panic!("expected generate command");
+        };
+        assert_eq!(input, PathBuf::from("data/raw"));
+        assert_eq!(output, PathBuf::from("dist"));
     }
 }

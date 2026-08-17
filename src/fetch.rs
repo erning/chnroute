@@ -9,110 +9,23 @@ use ipnet::IpNet;
 use reqwest::Url;
 use reqwest::blocking::{Client, Response};
 use reqwest::header::{ACCEPT, USER_AGENT};
-use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
-use tempfile::{Builder as TempDirBuilder, TempDir};
+use tempfile::Builder as TempDirBuilder;
 use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
 
+use crate::publish::publish_staged_directory;
+use crate::source::{
+    AddressFamily, FileManifest, MANIFEST_FILE, MANIFEST_SCHEMA_VERSION, Manifest, REPOSITORY_ID,
+    SOURCE_FILES, SourceFile, SourceManifest, read_manifest, sha256, verify_snapshot,
+};
+
 const OWNER: &str = "gaoyifan";
 const REPOSITORY: &str = "china-operator-ip";
-const REPOSITORY_ID: &str = "gaoyifan/china-operator-ip";
 const GITHUB_ROOT: &str = "https://github.com/";
 const RAW_ROOT: &str = "https://raw.githubusercontent.com/";
 const USER_AGENT_VALUE: &str = "chnroute/0.1";
-const MANIFEST_FILE: &str = "manifest.json";
-const MANIFEST_SCHEMA_VERSION: u32 = 1;
 const MAX_REF_DISCOVERY_BYTES: usize = 4 * 1024 * 1024;
 const MAX_DATA_BYTES: usize = 64 * 1024 * 1024;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum AddressFamily {
-    Ipv4,
-    Ipv6,
-}
-
-impl AddressFamily {
-    const fn number(self) -> u8 {
-        match self {
-            Self::Ipv4 => 4,
-            Self::Ipv6 => 6,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct SourceFile {
-    name: &'static str,
-    family: AddressFamily,
-}
-
-const SOURCE_FILES: [SourceFile; 16] = [
-    SourceFile {
-        name: "china.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "china6.txt",
-        family: AddressFamily::Ipv6,
-    },
-    SourceFile {
-        name: "chinanet.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "chinanet6.txt",
-        family: AddressFamily::Ipv6,
-    },
-    SourceFile {
-        name: "cmcc.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "cmcc6.txt",
-        family: AddressFamily::Ipv6,
-    },
-    SourceFile {
-        name: "unicom.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "unicom6.txt",
-        family: AddressFamily::Ipv6,
-    },
-    SourceFile {
-        name: "cernet.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "cernet6.txt",
-        family: AddressFamily::Ipv6,
-    },
-    SourceFile {
-        name: "cstnet.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "cstnet6.txt",
-        family: AddressFamily::Ipv6,
-    },
-    SourceFile {
-        name: "drpeng.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "drpeng6.txt",
-        family: AddressFamily::Ipv6,
-    },
-    SourceFile {
-        name: "googlecn.txt",
-        family: AddressFamily::Ipv4,
-    },
-    SourceFile {
-        name: "googlecn6.txt",
-        family: AddressFamily::Ipv6,
-    },
-];
 
 #[derive(Debug)]
 pub struct FetchOptions {
@@ -134,29 +47,6 @@ pub struct FetchResult {
     pub commit: String,
     pub file_count: usize,
     pub prefix_count: usize,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct Manifest {
-    schema_version: u32,
-    source: SourceManifest,
-    fetched_at: String,
-    files: BTreeMap<String, FileManifest>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct SourceManifest {
-    repository: String,
-    requested_ref: String,
-    commit: String,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-struct FileManifest {
-    sha256: String,
-    bytes: u64,
-    prefixes: usize,
-    address_family: u8,
 }
 
 trait HttpClient {
@@ -267,7 +157,7 @@ fn fetch_with_client(client: &dyn HttpClient, options: FetchOptions) -> Result<F
         files,
     };
     write_manifest(staging.path(), &manifest)?;
-    publish(staging, &options.output)?;
+    publish_staged_directory(staging, &options.output)?;
 
     Ok(result_from_manifest(
         FetchStatus::Updated,
@@ -323,20 +213,12 @@ fn inspect_output(output: &Path) -> Result<Option<Manifest>> {
         );
     }
 
-    let bytes = fs::read(&manifest_path)
-        .with_context(|| format!("failed to read {}", manifest_path.display()))?;
-    let manifest: Manifest = serde_json::from_slice(&bytes)
-        .with_context(|| format!("failed to parse {}", manifest_path.display()))?;
-    if manifest.schema_version != MANIFEST_SCHEMA_VERSION
-        || manifest.source.repository != REPOSITORY_ID
-    {
-        bail!(
-            "refusing to replace output owned by an incompatible source or schema: {}",
+    read_manifest(output).map(Some).with_context(|| {
+        format!(
+            "refusing to replace incompatible output: {}",
             output.display()
-        );
-    }
-
-    Ok(Some(manifest))
+        )
+    })
 }
 
 fn resolve_commit(client: &dyn HttpClient, requested_ref: &str) -> Result<String> {
@@ -519,91 +401,6 @@ fn write_manifest(staging: &Path, manifest: &Manifest) -> Result<()> {
     write_staged_file(staging, MANIFEST_FILE, &bytes)
 }
 
-fn publish(staging: TempDir, output: &Path) -> Result<()> {
-    let staging_path = staging.keep();
-
-    if !output.exists() {
-        return fs::rename(&staging_path, output).with_context(|| {
-            format!(
-                "failed to publish {} to {}",
-                staging_path.display(),
-                output.display()
-            )
-        });
-    }
-
-    let parent = output.parent().unwrap_or_else(|| Path::new("."));
-    let output_name = output
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| anyhow!("output directory must have a valid final component"))?;
-    let backup_reservation = TempDirBuilder::new()
-        .prefix(&format!(".{output_name}.backup-"))
-        .tempdir_in(parent)
-        .context("failed to reserve rollback directory")?;
-    let backup = backup_reservation.path().to_owned();
-    backup_reservation
-        .close()
-        .context("failed to prepare rollback directory")?;
-
-    fs::rename(output, &backup).with_context(|| {
-        format!(
-            "failed to move existing snapshot {} to {}",
-            output.display(),
-            backup.display()
-        )
-    })?;
-
-    if let Err(publish_error) = fs::rename(&staging_path, output) {
-        let restore_result = fs::rename(&backup, output);
-        let _ = fs::remove_dir_all(&staging_path);
-        return match restore_result {
-            Ok(()) => Err(publish_error).with_context(|| {
-                format!(
-                    "failed to publish new snapshot; restored {}",
-                    output.display()
-                )
-            }),
-            Err(restore_error) => Err(anyhow!(
-                "failed to publish new snapshot ({publish_error}) and failed to restore {} ({restore_error}); backup remains at {}",
-                output.display(),
-                backup.display()
-            )),
-        };
-    }
-
-    let _ = fs::remove_dir_all(backup);
-    Ok(())
-}
-
-fn verify_snapshot(output: &Path, manifest: &Manifest) -> Result<bool> {
-    if manifest.files.len() != SOURCE_FILES.len() {
-        return Ok(false);
-    }
-
-    for source in SOURCE_FILES {
-        let Some(expected) = manifest.files.get(source.name) else {
-            return Ok(false);
-        };
-        if expected.address_family != source.family.number() {
-            return Ok(false);
-        }
-        let path = output.join(source.name);
-        let bytes = match fs::read(&path) {
-            Ok(bytes) => bytes,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-            Err(error) => {
-                return Err(error).with_context(|| format!("failed to verify {}", path.display()));
-            }
-        };
-        if bytes.len() as u64 != expected.bytes || sha256(&bytes) != expected.sha256 {
-            return Ok(false);
-        }
-    }
-
-    Ok(true)
-}
-
 fn result_from_manifest(status: FetchStatus, commit: String, manifest: &Manifest) -> FetchResult {
     FetchResult {
         status,
@@ -612,10 +409,6 @@ fn result_from_manifest(status: FetchStatus, commit: String, manifest: &Manifest
         file_count: manifest.files.len(),
         prefix_count: manifest.files.values().map(|file| file.prefixes).sum(),
     }
-}
-
-fn sha256(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
 }
 
 #[cfg(test)]

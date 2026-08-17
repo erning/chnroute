@@ -41,10 +41,10 @@ private intersect special = empty
 将来生成“中国大陆以外”集合时使用：
 
 ```text
-nonchina = universe - private - special - china
+non-chnroute = universe - private - special - chnroute
 ```
 
-其中，`china` 完全采信上游数据，不由本目录重新判断。
+其中，`chnroute` 完全采信上游 `china` 数据，不由本目录重新判断。
 
 ## 规则语法
 

@@ -1,5 +1,8 @@
 /target/
 /data/raw/
+/dist/
 .DS_Store
 .raw.fetch-*
 .raw.backup-*
+.dist.generate-*
+.dist.backup-*

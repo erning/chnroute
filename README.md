@@ -2,7 +2,7 @@
 
 `chnroute` 用于获取并生成按区域和网络运营商划分的 IPv4、IPv6 路由表。
 
-当前仅实现 `fetch` 子命令。该命令从
+`fetch` 子命令从
 [`gaoyifan/china-operator-ip`](https://github.com/gaoyifan/china-operator-ip)
 的 `ip-lists` 分支下载以下原始数据：
 
@@ -72,10 +72,72 @@ IPv6 地址；此时 `manifest.json` 中的 CIDR 数量为 `0`。
 快照；失败时保留原有数据。为避免误删用户文件，程序不会替换缺少有效
 `manifest.json` 的非空目录，也不会替换符号链接。
 
+## 生成路由表
+
+获取原始数据后，运行：
+
+```console
+cargo run -- generate
+```
+
+`generate` 默认读取 `data/raw`，并将结果写入 `dist`。也可以分别指定输入和输出目录：
+
+```console
+cargo run -- generate --input data/raw --output dist
+```
+
+生成过程不会访问网络，也不会修改原始快照。程序首先根据 `manifest.json` 验证全部
+16 个原始文件的大小和 SHA-256，然后执行集合运算。输入不完整或内容与清单不符时，
+命令会停止，不会发布部分结果。
+
+### 输出文件
+
+每个集合分别生成 IPv4 和 IPv6 文件。IPv4 使用基本文件名，IPv6 在扩展名前增加
+`6`：
+
+| 集合 | IPv4 | IPv6 |
+| --- | --- | --- |
+| 中国大陆 | `chnroute.txt` | `chnroute6.txt` |
+| 中国大陆以外的公网地址 | `non-chnroute.txt` | `non-chnroute6.txt` |
+| 中国电信 | `china-telecom.txt` | `china-telecom6.txt` |
+| 中国移动 | `china-mobile.txt` | `china-mobile6.txt` |
+| 中国联通 | `china-unicom.txt` | `china-unicom6.txt` |
+| 中国其他运营商 | `china-other.txt` | `china-other6.txt` |
+| 私有网络 | `private.txt` | `private6.txt` |
+| 其他非公网地址 | `special.txt` | `special6.txt` |
+
+三个组合集合的定义如下：
+
+```ini
+chnroute     = public addresses in mainland China
+non-chnroute = public addresses outside chnroute
+china-other  = other mainland China operators
+```
+
+`china-other` 是教育网、科技网、鹏博士和谷歌中国四个上游集合的并集。运营商集合可能
+相互重叠，生成过程不会自行规定运营商优先级，也不会从 `china-other` 中扣除三大运营商
+的地址。
+
+`non-chnroute` 按以下关系计算：
+
+```text
+non-chnroute = complete address space - private - special - chnroute
+```
+
+其中，`private` 和 `special` 来自编译进程序的
+[`data/builtin`](data/builtin/README.md) 规则，二者互不相交。`chnroute` 直接采用上游
+`china` 集合，不使用本地归属判断。
+
+所有输出都会按照地址顺序排列，并合并为确定且最小的 CIDR 集。`dist/manifest.json`
+记录输入仓库、提交散列，以及每个输出文件的地址族、CIDR 数量、文件大小和 SHA-256。
+
+生成结果同样通过暂存目录整体发布。程序可以安全替换自己此前生成的目录，但不会替换
+符号链接、与输入目录重叠的目录，或缺少兼容 `manifest.json` 的非空目录。
+
 ## 测试
 
 ```console
 cargo test
 ```
 
-测试使用内存中的模拟响应，不访问网络。
+`fetch` 测试使用内存中的模拟响应，`generate` 测试使用临时快照；测试过程不访问网络。
