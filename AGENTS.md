@@ -33,7 +33,8 @@ local geolocation or operator heuristics:
 The planned generated sets have these semantics:
 
 - `private`: built-in project knowledge.
-- `nonpublic`: built-in project knowledge, excluding `private`.
+- `special`: built-in special-use and other non-public address knowledge,
+  excluding `private`.
 - `china`: the upstream `china` set.
 - `nonchina`: the public address space minus `china`.
 - `chinanet`: the upstream `chinanet` set.

@@ -1,0 +1,4 @@
+# IPv6 unique-local address space.
+# Source: RFC 4193.
+
+fc00::/7

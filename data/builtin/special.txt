@@ -1,0 +1,45 @@
+# IPv4 addresses that are not ordinary globally reachable destinations.
+# Private-use prefixes are intentionally excluded.
+#
+# Rules are applied from top to bottom. A CIDR adds addresses to the set.
+# A rule prefixed with ! removes addresses from the set.
+#
+# Sources:
+# - RFC 6890 special-purpose address registries.
+# - IANA IPv4 Special-Purpose Address Space, updated 2025-10-09.
+# - IANA IPv4 multicast and reserved address-space assignments.
+
+# This network.
+0.0.0.0/8
+
+# Shared address space.
+100.64.0.0/10
+
+# Loopback.
+127.0.0.0/8
+
+# Link local.
+169.254.0.0/16
+
+# IETF protocol assignments. The two anycast addresses are globally
+# reachable and are therefore removed from this set.
+192.0.0.0/24
+!192.0.0.9/32
+!192.0.0.10/32
+
+# Documentation ranges.
+192.0.2.0/24
+198.51.100.0/24
+203.0.113.0/24
+
+# Deprecated 6to4 relay anycast.
+192.88.99.0/24
+
+# Benchmarking.
+198.18.0.0/15
+
+# Multicast.
+224.0.0.0/4
+
+# Reserved and limited broadcast.
+240.0.0.0/4
