@@ -96,6 +96,28 @@ properties:
 Tests must use the in-memory fake HTTP client. Unit and integration tests must
 not depend on live network access.
 
+## Distribution Publishing Contract
+
+`scripts/publish-dist.sh` publishes generated artifacts, not source code. Keep
+these properties:
+
+- Require a clean source worktree and record its full commit SHA in the
+  distribution commit message.
+- Run tests and generation offline before publishing.
+- Use a temporary Git worktree. Never switch the source worktree to the
+  `dist` branch or remove source files from it.
+- Create `dist` as an orphan branch on its first publication. Later
+  publications must extend its existing linear history.
+- Make the `dist` branch root exactly mirror the generated `dist/` directory.
+- Create no commit when generated artifacts are unchanged.
+- Keep pushing opt-in through `--push`; the default operation must modify only
+  the local repository.
+- Do not fetch, merge, force-push, or resolve diverged branch history
+  automatically. A normal push must fail safely when the remote branch has
+  advanced.
+- Keep script help, progress, warnings, errors, and commit messages in English
+  ASCII.
+
 ## CLI Output Contract
 
 All command-line output must be English ASCII. This includes:
@@ -127,6 +149,7 @@ src/ipset.rs     IPv4 and IPv6 set algebra and CIDR normalization
 src/source.rs    Shared upstream snapshot schema and integrity checks
 src/publish.rs   Atomic directory publication with rollback
 src/lib.rs       Library module exports
+scripts/publish-dist.sh  Publish generated files through an isolated worktree
 data/builtin/    Built-in private and special address rules
 data/raw/        Downloaded upstream snapshot and manifest
 dist/            Generated route tables and manifest

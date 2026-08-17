@@ -134,6 +134,39 @@ non-chnroute = complete address space - private - special - chnroute
 生成结果同样通过暂存目录整体发布。程序可以安全替换自己此前生成的目录，但不会替换
 符号链接、与输入目录重叠的目录，或缺少兼容 `manifest.json` 的非空目录。
 
+## 发布到 `dist` 分支
+
+运行以下脚本，可以重新生成路由表，并将 `dist/` 的内容发布到本地 `dist` 分支的根
+目录：
+
+```console
+scripts/publish-dist.sh
+```
+
+脚本要求源码工作树没有未提交修改。发布前会离线运行测试和 `generate`，然后在由
+`git worktree` 创建的临时工作树中维护发行分支。首次发布时，脚本将 `dist` 创建为
+不包含源码历史的孤立分支；后续发布提交沿用该分支现有历史。脚本不会切换当前工作树的
+分支，也不会删除当前工作树中的源码。
+
+发行分支的根目录与本地 `dist/` 完全一致，只包含生成的路由表和 `manifest.json`。
+如果生成内容没有变化，脚本不会创建空提交。
+
+默认操作只创建本地提交，不访问远端。确认结果后，可以显式推送到 `origin`：
+
+```console
+scripts/publish-dist.sh --push
+```
+
+每个发行提交都会在提交信息中记录生成它的源码提交。上游数据提交、文件散列和前缀
+数量继续以 `manifest.json` 为准。如果远端 `dist` 已经前进，普通推送会安全失败；脚本
+不会自动拉取、合并或强制推送。
+
+发布到 GitHub 后，可以通过固定的原始文件 URL 订阅根目录中的文件：
+
+```text
+https://raw.githubusercontent.com/<owner>/<repository>/dist/chnroute.txt
+```
+
 ## 测试
 
 ```console
