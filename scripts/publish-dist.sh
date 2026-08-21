@@ -102,6 +102,7 @@ cp -R "$DIST_DIR/." "$PUBLISH_TREE/"
 git -C "$PUBLISH_TREE" add -A
 git -C "$PUBLISH_TREE" diff --cached --check
 
+DIST_CHANGED=false
 if git -C "$PUBLISH_TREE" diff --cached --quiet; then
     printf '%s\n' 'distribution is already current'
 else
@@ -109,13 +110,16 @@ else
         -m 'chore(dist): publish route tables' \
         -m "Generated-From: $SOURCE_COMMIT" \
         -m 'Upstream source details and artifact hashes are recorded in manifest.json.'
+    DIST_CHANGED=true
 fi
 
 DIST_COMMIT=$(git -C "$PUBLISH_TREE" rev-parse HEAD)
 printf 'published local dist branch at %s\n' "$DIST_COMMIT"
 
-if [ "$PUSH" = true ]; then
+if [ "$PUSH" = true ] && [ "$DIST_CHANGED" = true ]; then
     git -C "$PUBLISH_TREE" push "$REMOTE_NAME" \
         "refs/heads/$DIST_BRANCH:refs/heads/$DIST_BRANCH"
     printf 'pushed dist branch to %s\n' "$REMOTE_NAME"
+elif [ "$PUSH" = true ]; then
+    printf '%s\n' 'distribution is unchanged; skipping push'
 fi

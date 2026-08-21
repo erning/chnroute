@@ -1,0 +1,44 @@
+name: Update dist
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+      timezone: "UTC"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-dist
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source and distribution history
+        uses: actions/checkout@v7
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure Git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch Rust dependencies
+        run: cargo fetch --locked
+
+      - name: Fetch upstream snapshot
+        run: cargo run --locked --release -- fetch
+
+      - name: Publish changed distribution
+        run: scripts/publish-dist.sh --push
