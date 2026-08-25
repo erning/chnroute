@@ -3,7 +3,7 @@
   "generator": "chnroute",
   "source": {
     "repository": "gaoyifan/china-operator-ip",
-    "commit": "3436f54e8db1d63139d08365e98cf9626f3e96ad"
+    "commit": "2b299fb649222170d404876a41a897fbd0c435e6"
   },
   "files": {
     "china-mobile.txt": {
@@ -65,34 +65,34 @@
       ]
     },
     "china-telecom46.txt": {
-      "sha256": "ef1282698c38038f65036bab3031fca6a626c383aa0cff7ceb41e123f0cb5af7",
-      "bytes": 77532,
-      "prefixes": 4783,
+      "sha256": "6183c09a85bb4550dbca7eef92d727fe2693317e0db75fbe0912cc66cf485311",
+      "bytes": 77589,
+      "prefixes": 4786,
       "address_family": [
         4,
         6
       ]
     },
     "china-telecom6.txt": {
-      "sha256": "503989a25fc7b0a27464c2eb7e3fa47a242235ed777948023cc34b3805488c04",
-      "bytes": 15645,
-      "prefixes": 851,
+      "sha256": "2e8d0e952b6b40c611b736e587ddd31e087db9b1fbf68b606315b1ee84eaf641",
+      "bytes": 15702,
+      "prefixes": 854,
       "address_family": [
         6
       ]
     },
     "china-unicom.txt": {
-      "sha256": "04b6ff36e7a2f83378d4f4462ea56c5e1d5d3c1355b0c6f06ea02661b94818d3",
-      "bytes": 59043,
-      "prefixes": 3730,
+      "sha256": "2945256f00eb656dff988367a587b88d24d105202c85ce0fdef7e48b058105ff",
+      "bytes": 59027,
+      "prefixes": 3729,
       "address_family": [
         4
       ]
     },
     "china-unicom46.txt": {
-      "sha256": "a8a79caf4a602e806617df32a5e08f5d84ef5c47f393db0e4aaa3dde2b8253d4",
-      "bytes": 83444,
-      "prefixes": 5084,
+      "sha256": "29bd02ee40c8aa7656ca70ab8379d3151c32d884fdfcd11b8f0be65f067e6a5e",
+      "bytes": 83428,
+      "prefixes": 5083,
       "address_family": [
         4,
         6
