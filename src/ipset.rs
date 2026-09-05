@@ -76,9 +76,10 @@ impl IpSet {
 
             let network = parse_network(line, family)
                 .with_context(|| format!("{label}: invalid line {}", index + 1))?;
-            set.add_network(network)?;
+            set.ranges.push(network_range(network));
         }
 
+        normalize(&mut set.ranges);
         Ok(set)
     }
 
@@ -374,6 +375,37 @@ mod tests {
     }
 
     #[test]
+    fn normalizes_unsorted_overlapping_and_duplicate_prefixes() {
+        for (family, input, expected) in [
+            (
+                IpFamily::V4,
+                "\u{feff}192.0.2.128/25\r\n10.1.0.0/16\n192.0.2.0/24\n10.0.0.0/8\n10.0.0.0/8\n",
+                "10.0.0.0/8\n192.0.2.0/24\n",
+            ),
+            (
+                IpFamily::V6,
+                "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128\n::1/128\nffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe/127\n::/128\n::1/128\n",
+                "::/127\nffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe/127\n",
+            ),
+        ] {
+            let set = IpSet::parse_cidrs(input, family, "test").unwrap();
+            assert_eq!(set.to_text().unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn normalizes_large_unsorted_input_without_changing_membership() {
+        let prefixes: Vec<String> = (0..40_000_u32)
+            .map(|index| format!("{}/24\n", Ipv4Addr::from(index * 512)))
+            .collect();
+        let input: String = prefixes.iter().rev().map(String::as_str).collect();
+
+        let set = IpSet::parse_cidrs(&input, IpFamily::V4, "test").unwrap();
+
+        assert_eq!(set.to_text().unwrap(), prefixes.concat());
+    }
+
+    #[test]
     fn applies_ordered_add_and_remove_rules() {
         let set = IpSet::parse_rules(
             "192.0.0.0/24\n!192.0.0.9/32\n!192.0.0.10/32\n",
@@ -386,6 +418,18 @@ mod tests {
         assert!(!set.contains("192.0.0.9".parse().unwrap()));
         assert!(!set.contains("192.0.0.10".parse().unwrap()));
         assert!(set.contains("192.0.0.11".parse().unwrap()));
+    }
+
+    #[test]
+    fn ordered_rules_can_readd_removed_addresses() {
+        let set = IpSet::parse_rules(
+            "192.0.2.0/24\n!192.0.2.0/24\n192.0.2.128/25\n",
+            IpFamily::V4,
+            "test",
+        )
+        .unwrap();
+
+        assert_eq!(set.to_text().unwrap(), "192.0.2.128/25\n");
     }
 
     #[test]
