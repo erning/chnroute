@@ -3,30 +3,30 @@
   "generator": "chnroute",
   "source": {
     "repository": "gaoyifan/china-operator-ip",
-    "commit": "a24f1e0f147dca7a421d7141422665b0c99f6006"
+    "commit": "fa8d2bcf9defad277cb9bcd2c730c180278ffe8e"
   },
   "files": {
     "china-mobile.txt": {
-      "sha256": "fa68d82ea5b4f6eb17c2b6ca4bcec139e5e101ca000cc3b2476b8330ed6c281a",
-      "bytes": 17712,
-      "prefixes": 1117,
+      "sha256": "9b54d699b5f9849bf79dc81f872943514b4e907b7e5af1bde7f7927dd31eea0b",
+      "bytes": 17760,
+      "prefixes": 1120,
       "address_family": [
         4
       ]
     },
     "china-mobile46.txt": {
-      "sha256": "3ae6fd1196218e027acc961382cacca7ca89fb9d50b35447fa3d00430dce4e37",
-      "bytes": 20087,
-      "prefixes": 1249,
+      "sha256": "58fae2e41d442b434dbbbdf995281ec5ed168111c49902b002c6a38658cc5ebf",
+      "bytes": 20155,
+      "prefixes": 1253,
       "address_family": [
         4,
         6
       ]
     },
     "china-mobile6.txt": {
-      "sha256": "66c558a8677102ae45268cf6622ccbaa89122a16133d06fd3861569f7a02ebf6",
-      "bytes": 2375,
-      "prefixes": 132,
+      "sha256": "0cde68a6f51305cc6b9d35c6b9bdf6debb03dca1ad1f27570944f6cd2d71137e",
+      "bytes": 2395,
+      "prefixes": 133,
       "address_family": [
         6
       ]
@@ -57,17 +57,17 @@
       ]
     },
     "china-telecom.txt": {
-      "sha256": "092622e12bedede3e23c6ee49f800114b6d7497c54a9a39a7199d9cc4c3d1b11",
-      "bytes": 61461,
-      "prefixes": 3907,
+      "sha256": "72e664ebe240c98daba1564bc777beaaf8fa79d56d9b55ffa8ee743ff66eb764",
+      "bytes": 61390,
+      "prefixes": 3903,
       "address_family": [
         4
       ]
     },
     "china-telecom46.txt": {
-      "sha256": "66c2ef01e16be7d727fb9f04c3a0f68d0157e987070aa6914d5a9a1b92a53db8",
-      "bytes": 77083,
-      "prefixes": 4757,
+      "sha256": "4f4891a3ea1d5f127344e8ec0dd6cc0a9547da6b969a131b993e58520964f283",
+      "bytes": 77012,
+      "prefixes": 4753,
       "address_family": [
         4,
         6
@@ -82,17 +82,17 @@
       ]
     },
     "china-unicom.txt": {
-      "sha256": "a70c84b6d5b2975ba40bd6b977a5e63c86b5deef028c3e9d3dacc81f8a67efb6",
-      "bytes": 58787,
-      "prefixes": 3715,
+      "sha256": "a1d3df3634fd9b94871b7218e17d392776a1db46dfd97f87bbd718bb096e4bf1",
+      "bytes": 58879,
+      "prefixes": 3721,
       "address_family": [
         4
       ]
     },
     "china-unicom46.txt": {
-      "sha256": "4e35e0ff1f62f56b9dd9f9c4a4bf88ef1fee7713face45a20d256d8facf578d0",
-      "bytes": 83223,
-      "prefixes": 5071,
+      "sha256": "22bb2caf81557b1594bc2f6a177729c370f5a3440f89346095e36d017e3cee6c",
+      "bytes": 83315,
+      "prefixes": 5077,
       "address_family": [
         4,
         6
@@ -107,7 +107,7 @@
       ]
     },
     "chnroute.txt": {
-      "sha256": "4b2e1cf9826fd4e6e3a6f2813630dde00b1c71b52d13e2f78540a3fa4fa844fc",
+      "sha256": "59e5e20e01176482925b45ffc199b23adab777b8d0aa79571f310530891e49e6",
       "bytes": 96831,
       "prefixes": 6229,
       "address_family": [
@@ -115,43 +115,43 @@
       ]
     },
     "chnroute46.txt": {
-      "sha256": "1c7e33034cf1bf74c68d8cc3ec6afba0dc039baedbf9fa6d47998f63f32f5b23",
-      "bytes": 153187,
-      "prefixes": 9622,
+      "sha256": "944810fea3e20be1eea99f7e484e95491f8abee127053e1d93229c5a1674bff0",
+      "bytes": 153202,
+      "prefixes": 9623,
       "address_family": [
         4,
         6
       ]
     },
     "chnroute6.txt": {
-      "sha256": "55c594090f509cac60efc47b2dbe7e61a51814e54f6e35d48f0eae03f26132da",
-      "bytes": 56356,
-      "prefixes": 3393,
+      "sha256": "31eb1390fee8f8e9861cbd70c207936c1e2cf6338c3a9fe7418997fd77b0da75",
+      "bytes": 56371,
+      "prefixes": 3394,
       "address_family": [
         6
       ]
     },
     "non-chnroute.txt": {
-      "sha256": "7421238e12f7775325a36136ee832f635302b929699afc73f43f023097cf8922",
-      "bytes": 197931,
-      "prefixes": 12758,
+      "sha256": "a08436a5c3c9e5ab7ec6dc23fd4fa6d24c9ca1d0d39caf654f9d82998fdf67c0",
+      "bytes": 197963,
+      "prefixes": 12760,
       "address_family": [
         4
       ]
     },
     "non-chnroute46.txt": {
-      "sha256": "c2d2698357dcaff0cfc2ba0fd55268c4d688f00efcffc6a7882301a12901aa29",
-      "bytes": 430214,
-      "prefixes": 28083,
+      "sha256": "4524322791dbb0833286a3eabad12774db1777e7eb6f175c7570721bc3a66a5a",
+      "bytes": 430351,
+      "prefixes": 28092,
       "address_family": [
         4,
         6
       ]
     },
     "non-chnroute6.txt": {
-      "sha256": "571122db13642badb67e536b8192ca2432a22b1e5c6abe448818a0eb6e58abf7",
-      "bytes": 232283,
-      "prefixes": 15325,
+      "sha256": "fe844d44a03aa316322370d21ab35a3312a6350daa09475a223094278dc236bb",
+      "bytes": 232388,
+      "prefixes": 15332,
       "address_family": [
         6
       ]
